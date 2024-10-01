@@ -1,0 +1,20 @@
+brickstor_map:
+  brickstor1:
+    restIp: https://10.2.21.10:8443
+    username: bsradmin
+    password: Brickstor@1
+    defaultDataset: p01/global/data/csi
+    defaultDataIp: 10.3.21.49
+    zone: zone-1
+    defaultMountFsType: cifs
+    defaultMountOptions: username=bsradmin,password=Brickstor@1
+
+  brickstor2:
+    restIp: https://10.2.21.12:8443,https://10.2.21.13:8443
+    username: bsradmin
+    password: Brickstor@1
+    defaultDataset: p02/global/data/csi
+    defaultDataIp: 10.3.21.50
+    zone: zone-2
+    defaultMountFsType: cifs
+    defaultMountOptions: username=bsradmin,password=Brickstor@1

@@ -1,0 +1,12 @@
+brickstor_map:
+  bsr-sanity-box1:
+    restIp: https://10.3.199.28:8443
+    username: bsradmin
+    password: racktop@1
+    defaultDataset: p0/global/data/csi
+    defaultDataIp: 10.3.199.28
+    defaultMountFsType: nfs
+    defaultMountOptions: nolock,vers=4 # only vers=4 works in container
+    # zone: local
+
+debug: false

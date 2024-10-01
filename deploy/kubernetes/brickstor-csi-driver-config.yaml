@@ -1,0 +1,38 @@
+# brickstor-csi-driver config file
+#
+# $ kubectl create secret generic brickstor-csi-driver-config \
+#   --from-file=deploy/kubernetes/brickstor-csi-driver-config.yaml
+#
+
+brickstor_map:
+  brickstor1:
+    restIp: https://10.2.21.10:8443     # [required] BrickStor REST API endpoint
+    username: bsradmin                  # [required] BrickStor REST API username
+    password: Brickstor@1               # [required] BrickStor REST API password
+    defaultDataset: p01/global/data/csi # default dataset for driver's fs
+    defaultDataIp: 10.3.21.49           # default BrickStor data IP
+    defaultMountFsType: nfs             # default mount fs type [nfs|cifs]
+    defaultMountOptions: vers=4         # default mount options (mount -o ...)
+    # zone: zone-1
+    insecureSkipVerify: true
+
+  brickstor2:
+    restIp: https://10.2.21.11:8443     # [required] BrickStor REST API endpoint
+    username: bsradmin                  # [required] BrickStor REST API username
+    password: Brickstor@1               # [required] BrickStor REST API password
+    defaultDataset: p02/global/data/csi # default dataset for driver's fs
+    defaultDataIp: 10.2.21.51           # default BrickStor data IP
+    defaultMountFsType: nfs
+    # zone: zone-2
+    insecureSkipVerify: true
+
+  cluster1:
+    restIp: https://10.2.21.12:8443,https://10.2.21.13:8443 # [required] BrickStor cluster REST API endpoints
+    username: bsradmin                  # [required] BrickStor REST API username
+    password: Brickstor@1               # [required] BrickStor REST API password
+    defaultDataset: p01/global/data/csi # default dataset for driver's fs
+    defaultDataIp: 10.2.21.50           # default BrickStor data HA VIP
+    defaultMountFsType: nfs
+    insecureSkipVerify: true
+
+debug: false                            # true for more detailed logs

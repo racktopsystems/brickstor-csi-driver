@@ -1,0 +1,24 @@
+ARG BUILD_IMAGE
+
+# tests container
+FROM $BUILD_IMAGE
+
+# install deps
+RUN apk update &&\
+    apk add --no-cache rpcbind nfs-utils cifs-utils make openssh
+
+WORKDIR /go/src/github.com/racktopsystems/brickstor-csi-driver/
+COPY . ./
+
+ARG VERSION
+ARG TESTRAIL_URL
+ARG TESTRAIL_USR
+ARG TESTRAIL_PSWD
+
+ENV VERSION=$VERSION \
+    TESTRAIL_URL=$TESTRAIL_URL \
+    TESTRAIL_USR=$TESTRAIL_USR \
+    TESTRAIL_PSWD=$TESTRAIL_PSWD
+
+ENTRYPOINT ["make"]
+CMD ["test"]
