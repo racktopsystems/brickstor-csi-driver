@@ -1,5 +1,6 @@
 # BrickStor CSI Driver
-[![Go Report Card](https://goreportcard.com/badge/github.com/racktopsystems/brickstor-csi-driver)](https://goreportcard.com/report/github.com/racktopsystems/brickstor-csi-driver)
+
+BrickStor product page: [BrickStor SP](https://www.racktopsystems.com/brickstor-sp/).
 
 This is a **development branch**, for the most recent stable version see "Supported versions".
 
@@ -24,12 +25,12 @@ Releases can be found here - https://github.com/racktopsystems/brickstor-csi-dri
 |Creating and deleting snapshot|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
 |Provision volume from snapshot|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
 |Provision volume from another volume|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
-|List snapshots of a volume|Beta|>= v1.2.0|>= v1.0.0|>=1.17|
+|List snapshots of a volume|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
 |Expand volume|Beta|>= v1.0.0|>= v1.1.0|>=1.16|
 |Access list for volume (NFS only)|Beta|>= v1.0.0|>= v1.0.0|>=1.13|
 |Topology|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
-|StorageClass Secrets|Beta|>= v1.0.0|>=1.0.0|>=1.13|
-|Mount options|Beta|>=v1.0.0|>= v1.0.0|>=v1.13|
+|StorageClass Secrets|Beta|>= v1.0.0|>= v1.0.0|>=1.13|
+|Mount options|Beta|>= v1.0.0|>= v1.0.0|>=v1.13|
 
 
 ## Requirements
@@ -39,7 +40,7 @@ Releases can be found here - https://github.com/racktopsystems/brickstor-csi-dri
   ```
   --allow-privileged=true
   ```
-- Required the API server and the kubelet feature gates
+- Require the API server and the kubelet feature gates
   ([instructions](https://github.com/kubernetes-csi/docs/blob/735f1ef4adfcb157afce47c64d750b71012c8151/book/src/Setup.md#enabling-features)):
   ```
   --feature-gates=VolumeSnapshotDataSource=true,VolumePVCDataSource=true,ExpandInUsePersistentVolumes=true,ExpandCSIVolumes=true,ExpandPersistentVolumes=true,Topology=true,CSINodeInfo=true
@@ -66,7 +67,7 @@ Releases can be found here - https://github.com/racktopsystems/brickstor-csi-dri
    ```bash
    git clone https://github.com/racktopsystems/brickstor-csi-driver.git
    cd brickstor-csi-driver
-   git checkout master
+   git checkout master (only if currently on a branch)
    ```
 3. Edit the `deploy/kubernetes/brickstor-csi-driver-config.yaml` file. Driver configuration example:
    ```yaml
@@ -108,7 +109,7 @@ Releases can be found here - https://github.com/racktopsystems/brickstor-csi-dri
 
    | Name                  | Description                                                     | Required   | Example                                                      |
    |-----------------------|-----------------------------------------------------------------|------------|--------------------------------------------------------------|
-   | `restIp`              | BrickStor REST API endpoint(s); `,` to separate cluster nodes | yes        | `https://10.2.21.10:8443`                                      |
+   | `restIp`              | BrickStor REST API endpoint(s); use `,` to separate cluster nodes | yes        | `https://10.2.21.10:8443`<br>`https://10.2.21.10:8443,https://10.2.21.11:8443`                                      |
    | `username`            | BrickStor REST API username                                   | yes        | `bsradmin`                                                      |
    | `password`            | BrickStor REST API password                                   | yes        | `p@ssword`                                                   |
    | `defaultDataset`      | parent dataset for driver's datasets [pool/dataset]          | no         | `p0/global/data/csi`                             |
@@ -116,7 +117,7 @@ Releases can be found here - https://github.com/racktopsystems/brickstor-csi-dri
    | `defaultMountFsType`  | mount filesystem type [nfs, cifs](default: 'nfs')               | no         | `cifs`                                                       |
    | `defaultMountOptions` | NFS/CIFS mount options: `mount -o ...` (default: "")            | no         | NFS: `noatime,nosuid`<br>CIFS: `username=bsradmin,password=123` |
    | `debug`               | print more logs (default: false)                                | no         | `true`                                                       |
-   | `zone`                | Zone to match topology.kubernetes.io/zone.                      | no         | ` `                                                          |
+   | `zone`                | Zone to match topology.kubernetes.io/zone.                      | no         | `zone-1`                                                          |
    | `mountPointPermissions`| Permissions to be set on volume's mount point                | no            | `0777`     |
    | `insecureSkipVerify`| TLS certificates check will be skipped when `true` (default: 'true')| no            | `false`     |
 
