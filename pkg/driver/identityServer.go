@@ -29,7 +29,7 @@ func (ids *IdentityServer) GetPluginInfo(ctx context.Context,
 		VendorVersion: Version,
 	}
 
-	l.Debugf("response: '%+v'", res)
+	l.Debugf("response: '%s (%s)' %+v", res.Name, res.VendorVersion, res.Manifest)
 
 	return &res, nil
 }

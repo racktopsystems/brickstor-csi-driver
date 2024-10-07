@@ -14,6 +14,9 @@ import (
 	"github.com/racktopsystems/brickstor-csi-driver/pkg/driver"
 )
 
+// This command is primarily used as the runner for the csi-sanity tests. Some
+// point-testing functions are also included for simple standalone testing.
+
 const (
 	defaultEndpoint  = "unix:///var/lib/kubelet/plugins_registry/brickstor-csi-driver.racktopsystems.com/csi.sock"
 	defaultConfigDir = "/config"
@@ -96,11 +99,11 @@ func main() {
 		l.Fatal(err)
 	}
 
-	identityTest(d)
+	// identityTest(d)
 
-	controllerTest(d)
+	// controllerTest(d)
 
-	nodeTest(d)
+	// nodeTest(d)
 
 	// run driver
 	err = d.Run()

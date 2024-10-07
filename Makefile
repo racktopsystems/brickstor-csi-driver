@@ -7,23 +7,22 @@
 
 DRIVER_NAME = brickstor-csi-driver
 IMAGE_NAME ?= ${DRIVER_NAME}
+VERSION = 0.0.1
 
 BASE_IMAGE ?= alpine:3.20
-BUILD_IMAGE ?= golang:1.22.3-alpine3.20
+BUILD_IMAGE ?= golang:1.22
 CSI_SANITY_VERSION_TAG ?= v4.0.0
 
 DOCKER_FILE = Dockerfile
 DOCKER_FILE_TESTS = Dockerfile.tests
 DOCKER_FILE_TEST_CSI_SANITY = Dockerfile.csi-sanity
 
-REGISTRY ?= racktopsystems
-REGISTRY_LOCAL ?= 10.3.199.92:5000
+REGISTRY ?= racktop
+REGISTRY_LOCAL ?= 10.2.21.92:5000
 
 GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD | sed -e "s/.*\\///")
 GIT_TAG = $(shell git describe --tags)
-# use git branch as default version if not set by env variable, if HEAD is detached that use the most recent tag
-VERSION ?= $(if $(subst HEAD,,${GIT_BRANCH}),$(GIT_BRANCH),$(GIT_TAG))
-COMMIT ?= $(shell git rev-parse HEAD | cut -c 1-7)
+COMMIT ?= $(shell git rev-parse --short HEAD)
 DATETIME ?= $(shell date +'%F_%T')
 LDFLAGS ?= \
 	-X github.com/racktopsystems/brickstor-csi-driver/pkg/driver.Version=${VERSION} \
@@ -33,47 +32,49 @@ LDFLAGS ?= \
 DOCKER_ARGS = --build-arg BUILD_IMAGE=${BUILD_IMAGE} \
               --build-arg BASE_IMAGE=${BASE_IMAGE}
 
+# Pushing Docker image(s) to registry on demand
+PUSH=
+DOCKER_PUSH_ARG = $(if $(PUSH),--push,)
+
 .PHONY: all
 all:
 	@echo "Some commands:"
-	@echo "  container-build                 - build driver container"
-	@echo "  container-push-local            - push driver to local registry (${REGISTRY_DEVELOPMENT})"
-	@echo "  container-push-remote           - push driver to hub.docker.com registry (${REGISTRY_PRODUCTION})"
-	@echo "  test-all-local-image-container  - run all test using driver from local registry"
-	@echo "  test-all-remote-image-container - run all test using driver from hub.docker.com"
-	@echo "  release                         - create and publish a new release"
+	@echo "  build                          - build driver container"
+	@echo "  test-csi-sanity-container      - run csi-sanity test suite"
+	@echo "  container-push-local           - build driver container (PUSH to REGISTRY_LOCAL)"
+	@echo "  test-all-local-image-container - run all test using driver from REGISTRY_LOCAL)"
 	@echo ""
-	@make print-variables
-
-.PHONY: print-variables
-print-variables:
 	@echo "Variables:"
-	@echo "  VERSION:    ${VERSION}"
-	@echo "  GIT_BRANCH: ${GIT_BRANCH}"
-	@echo "  GIT_TAG:    ${GIT_TAG}"
-	@echo "  COMMIT:     ${COMMIT}"
+	@echo "  VERSION:        ${VERSION}"
+	@echo "  GIT_BRANCH:     ${GIT_BRANCH}"
+	@echo "  GIT_TAG:        ${GIT_TAG}"
+	@echo "  COMMIT:         ${COMMIT}"
+	@echo "  REGISTRY_LOCAL: ${REGISTRY_LOCAL}"
 	@echo "Testing variables:"
 	@echo "  TEST_K8S_IP: ${TEST_K8S_IP}"
 
 .PHONY: vet
 vet:
-	CGO_ENABLED=0 go vet -v ./...
+	CGO_ENABLED=0 GOTOOLCHAIN=local go vet -v ./...
 
 .PHONY: fmt
 fmt:
-	CGO_ENABLED=0 go fmt ./...
+	CGO_ENABLED=0 GOTOOLCHAIN=local go fmt ./...
 
 .PHONY: build
 build: vet fmt
-	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/${DRIVER_NAME} -ldflags "${LDFLAGS}" ./cmd
+	CGO_ENABLED=0 GOTOOLCHAIN=local GOOS=linux \
+		go build -o bin/${DRIVER_NAME} -ldflags "${LDFLAGS}" ./cmd
 
 .PHONY: container-build
 container-build:
-ifeq (${VERSION}, master)
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} ${DOCKER_ARGS} .
-else
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:v${VERSION} --build-arg VERSION=v${VERSION} ${DOCKER_ARGS} .
-endif
+	@echo [INFO] Building docker image ${REGISTRY}/${IMAGE_NAME}:${VERSION}
+	GOTOOLCHAIN=local docker build \
+		-f ${DOCKER_FILE} \
+		-t ${REGISTRY}/${IMAGE_NAME}:${VERSION} \
+		-t ${REGISTRY}/${IMAGE_NAME}:${COMMIT} \
+		--build-arg VERSION=${VERSION} \
+		${DOCKER_ARGS} ${DOCKER_PUSH_ARG} .
 
 .PHONY: container-push-local
 container-push-local:
@@ -113,6 +114,7 @@ test-e2e-k8s-local-image: check-env-TEST_K8S_IP
 		--k8sConnectionString="root@${TEST_K8S_IP}" \
 		--k8sDeploymentFile="/tmp/brickstor-csi-driver-local.yaml" \
 		--k8sSecretFile="./_configs/driver-config-single-cifs.yaml"
+
 .PHONY: test-e2e-k8s-local-image-container
 test-e2e-k8s-local-image-container: check-env-TEST_K8S_IP
 	docker build -f ${DOCKER_FILE_TESTS} -t ${IMAGE_NAME}-test --build-arg VERSION=${VERSION} \
@@ -135,6 +137,7 @@ test-e2e-k8s-remote-image: check-env-TEST_K8S_IP
 		--k8sConnectionString="root@${TEST_K8S_IP}" \
 		--k8sDeploymentFile="../../deploy/kubernetes/brickstor-csi-driver.yaml" \
 		--k8sSecretFile="./_configs/driver-config-single-cifs.yaml"
+
 .PHONY: test-e2e-k8s-local-image-container
 test-e2e-k8s-remote-image-container: check-env-TEST_K8S_IP
 	docker build -f ${DOCKER_FILE_TESTS} -t ${IMAGE_NAME}-test --build-arg VERSION=${VERSION} \
@@ -187,8 +190,8 @@ endif
 .PHONY: release
 release:
 	@echo "New tag: 'v${VERSION}'\n\n \
-		To change version set enviroment variable 'VERSION=X.X.X make release'.\n\n \
-		Confirm that:\n \
+	To change version set enviroment variable 'VERSION=X.X.X make release'.\n\n \
+	Confirm that:\n \
 		1. New version will be based on current '${GIT_BRANCH}' git branch\n \
 		2. Driver container '${IMAGE_NAME}' will be built\n \
 		3. Login to hub.docker.com will be requested\n \

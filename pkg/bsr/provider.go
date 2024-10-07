@@ -87,6 +87,7 @@ type Snapshot struct {
 	Path         string
 	Name         string
 	Parent       string
+	CreatedBy    string
 	Clones       []string
 	CreationTime time.Time
 }

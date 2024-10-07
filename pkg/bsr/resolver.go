@@ -35,7 +35,7 @@ func (r *Resolver) Resolve(path string) (ProviderInterface, error) {
 		// make a REST call to the node to get the named dataset (this tells
 		// us if that node is the "provider" of that dataset)
 		if _, err = node.GetDataset(path); err == nil {
-			l.Debugf("resolved '%s' to '%s'", path, node)
+			l.Debugf("resolved '%s' to '%s'", path, node.Addr())
 			return node, nil
 		}
 	}

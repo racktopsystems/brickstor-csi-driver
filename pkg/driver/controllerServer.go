@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
@@ -560,10 +561,20 @@ func (s *ControllerServer) CreateVolume(ctx context.Context,
 			return nil, err
 		}
 
-		bsrProvider = resolveResp.bsrProvider
 		datasetPath = resolveResp.datasetPath
+		srcDataset := volInfo.Path
+		if !strings.Contains(srcDataset, "/") {
+			if len(datasetPath) == 0 {
+				l.Errorf("Invalid volumeId: %s", sourceVolumeId)
+				return nil, status.Error(codes.NotFound, fmt.Sprintf("VolumeId is in wrong format: %s", sourceVolumeId))
+			}
+
+			srcDataset = filepath.Join(datasetPath, volInfo.Path)
+		}
+
+		bsrProvider = resolveResp.bsrProvider
 		volumePath = filepath.Join(datasetPath, volumeName)
-		err = s.createClonedVol(bsrProvider, volInfo.Path, volumePath, volumeName, capacityBytes)
+		err = s.createClonedVol(resolveResp, srcDataset, volumePath, volumeName, capacityBytes)
 
 	} else {
 		if datasetPath == "" && configName == "" {
@@ -588,6 +599,19 @@ func (s *ControllerServer) CreateVolume(ctx context.Context,
 	if err != nil {
 		l.Errorf("%s", err)
 		return nil, err
+	}
+
+	// attempt to ensure CreateVolume is synchronous
+	i := 0
+	for ; i < 10; i++ {
+		if _, err := bsrProvider.GetDataset(volumePath); err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	if i == 10 {
+		l.Warnf("Dataset '%s' not visible after 10 seconds", volumePath)
 	}
 
 	cfg, ok := s.config.LookupNode(resolveResp.configName)
@@ -664,7 +688,7 @@ func (s *ControllerServer) createNewVol(bsrProvider bsr.ProviderInterface,
 					volumePath, err)
 			}
 
-			if capacityBytes != 0 && ds.GetRefQuotaSize() != capacityBytes {
+			if capacityBytes != 0 && ds.GetRefQuotaSize() < capacityBytes {
 				return status.Errorf(codes.AlreadyExists,
 					"Existing volume '%s' has incorrect size (req=%d, curr=%d)",
 					volumePath, capacityBytes, ds.GetRefQuotaSize())
@@ -714,7 +738,7 @@ func (s *ControllerServer) createNewVolFromSnap(bsrProvider bsr.ProviderInterfac
 	return nil
 }
 
-func (s *ControllerServer) createClonedVol(bsrProvider bsr.ProviderInterface,
+func (s *ControllerServer) createClonedVol(resolver resolveBsrResponse,
 	sourceVolumeID string, volumePath string, volumeName string,
 	capacityBytes int64) error {
 
@@ -724,11 +748,12 @@ func (s *ControllerServer) createClonedVol(bsrProvider bsr.ProviderInterface,
 	snapName := fmt.Sprintf("k8s-clone-snapshot-%s", volumeName)
 	snapshotPath := fmt.Sprintf("%s@%s", sourceVolumeID, snapName)
 
-	_, err := s.CreateSnapshotOnBSR(bsrProvider, sourceVolumeID, snapName)
+	_, err := s.CreateSnapshotOnBSR(resolver, sourceVolumeID, snapName)
 	if err != nil {
 		return err
 	}
 
+	bsrProvider := resolver.bsrProvider
 	err = bsrProvider.CloneSnapshot(snapshotPath, volumePath, capacityBytes)
 	if err != nil {
 		if bsr.ErrIsExists(err) {
@@ -780,7 +805,9 @@ func (s *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 
 	resolveResp, err := s.resolveBSR(params)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
+		if status.Code(err) == codes.NotFound ||
+			strings.Contains(err.Error(), "NotFound") {
+
 			l.Infof("volume '%s' not found, that's OK for deletion request", volInfo.Path)
 			return &csi.DeleteVolumeResponse{}, nil
 		}
@@ -803,10 +830,18 @@ func (s *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
-func (s *ControllerServer) CreateSnapshotOnBSR(bsrProvider bsr.ProviderInterface,
+func (s *ControllerServer) CreateSnapshotOnBSR(resolver resolveBsrResponse,
 	volumePath, snapName string) (bsr.Snapshot, error) {
 
+	bsrProvider := resolver.bsrProvider
+
 	l := s.log.WithField("func", "CreateSnapshotOnBSR()")
+
+	_, err := bsrProvider.GetDataset(volumePath)
+	if err != nil {
+		return bsr.Snapshot{}, status.Errorf(codes.NotFound,
+			"Source volume '%s' does not exist", volumePath)
+	}
 
 	snapshotPath := fmt.Sprintf("%s@%s", volumePath, snapName)
 
@@ -819,6 +854,45 @@ func (s *ControllerServer) CreateSnapshotOnBSR(bsrProvider bsr.ProviderInterface
 		return snap, nil
 	}
 
+	// The snap name must be unique across all datasets. The csi-sanity test
+	// suite checks for this. We ignore errors here since this is not a hard
+	// requirement on BSR.
+	configEntry, ok := s.config.LookupNode(resolver.configName)
+	if ok {
+
+		// There are potentially hundreds of non-CSI datasets and tens of
+		// thousands of snapshots on the server/cluster if we look at all
+		// datasets. To prevent overflow problems for this "all snaps" case
+		// we limit this to datasets under the configured default dataset path.
+		dfltDataset := configEntry.DefaultDataset + "/"
+
+		datasets, err := bsrProvider.GetDatasets()
+		if err == nil {
+			var dsNames []string
+			for _, ds := range datasets {
+				// ignore datasets not under the default CSI dataset
+				if strings.HasPrefix(ds.Path, dfltDataset) {
+					dsNames = append(dsNames, ds.Path)
+				}
+			}
+
+			snaps, err := bsrProvider.GetSnapshots(dsNames)
+			if err == nil {
+				for _, s := range snaps {
+					if volumePath == s.Path {
+						// for idempotency, it is ok of the snap exists on the
+						// requested volume
+						continue
+					}
+					if snapName == s.Name {
+						return bsr.Snapshot{}, status.Errorf(codes.AlreadyExists,
+							"Duplicate snapshot '%s'", snapName)
+					}
+				}
+			}
+		}
+	}
+
 	l.Infof("creating snapshot '%s'", snapshotPath)
 	snapshot, err := bsrProvider.CreateSnapshot(volumePath, snapName)
 	if err != nil {
@@ -827,6 +901,21 @@ func (s *ControllerServer) CreateSnapshotOnBSR(bsrProvider bsr.ProviderInterface
 	}
 
 	l.Infof("successfully created snapshot %s@%s", volumePath, snapName)
+
+	// CreateSnapshot must be synchronous, so check if we can get this back in
+	// the list (snapd has refreshed).
+	i := 0
+	for ; i < 10; i++ {
+		if _, err := bsrProvider.GetSnapshot(snapshotPath); err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	if i == 10 {
+		l.Warnf("Snapshot '%s' not visible after 10 seconds", snapshotPath)
+	}
+
 	return snapshot, nil
 }
 
@@ -869,7 +958,7 @@ func (s *ControllerServer) CreateSnapshot(ctx context.Context,
 		return nil, err
 	}
 
-	createdSnapshot, err := s.CreateSnapshotOnBSR(resolveResp.bsrProvider, volInfo.Path, name)
+	createdSnapshot, err := s.CreateSnapshotOnBSR(resolveResp, volInfo.Path, name)
 	if err != nil {
 		return nil, err
 	}
@@ -1032,6 +1121,12 @@ func (s *ControllerServer) ListSnapshots(ctx context.Context,
 		}
 		addresses := strings.Split(configEntry.Address, ",")
 
+		// There are potentially hundreds of non-CSI datasets and tens of
+		// thousands of snapshots on the server/cluster if we look at all
+		// datasets. To prevent overflow problems for this "all snaps" case
+		// we limit this to datasets under the configured default dataset path.
+		dfltDataset := configEntry.DefaultDataset + "/"
+
 		var snapshots []bsr.Snapshot
 
 		// configName might be a cluster name. To handle a cluster we first
@@ -1055,9 +1150,12 @@ func (s *ControllerServer) ListSnapshots(ctx context.Context,
 				continue
 			}
 
-			dsNames := make([]string, len(datasets))
-			for i, ds := range datasets {
-				dsNames[i] = ds.Path
+			var dsNames []string
+			for _, ds := range datasets {
+				// ignore datasets not under the default CSI dataset
+				if strings.HasPrefix(ds.Path, dfltDataset) {
+					dsNames = append(dsNames, ds.Path)
+				}
 			}
 
 			// get all snaps for the named datasets on this node
@@ -1066,11 +1164,18 @@ func (s *ControllerServer) ListSnapshots(ctx context.Context,
 				continue // ignore this node
 			}
 
-			snapshots = append(snapshots, snaps...)
+			for _, snap := range snaps {
+				if snap.CreatedBy == "" {
+					continue
+				}
+
+				snapshots = append(snapshots, snap)
+			}
+
 		}
 
 		if len(snapshots) == 0 {
-			continue // highly unlikely
+			continue
 		}
 
 		for i, snap := range snapshots {
@@ -1087,7 +1192,10 @@ func (s *ControllerServer) ListSnapshots(ctx context.Context,
 			}
 		}
 
-		if startingOffset+len(entries) < len(snapshots) {
+		l.Infof("ListSnaps got: %d %d", len(entries), len(snapshots))
+		if maxEntries != 2000000000 &&
+			startingOffset+len(entries) < len(snapshots) {
+
 			l.Infof("limit (%d) reached while getting snaps for '%s'",
 				maxEntries, configName)
 
@@ -1272,6 +1380,10 @@ func (s *ControllerServer) getDsSnapList(req *csi.ListSnapshotsRequest) (*csi.Li
 			continue
 		}
 
+		if snapshot.CreatedBy == "" {
+			continue
+		}
+
 		response.Entries = append(response.Entries,
 			convertSnapToCSISnap(snapshot, configName))
 
@@ -1312,10 +1424,9 @@ func convertSnapToCSISnap(snap bsr.Snapshot, configName string) *csi.ListSnapsho
 // ValidateVolumeCapabilities validates volume capabilities
 // Shall return confirmed only if all the volume
 // capabilities specified in the request are supported.
-func (s *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (
-	*csi.ValidateVolumeCapabilitiesResponse,
-	error,
-) {
+func (s *ControllerServer) ValidateVolumeCapabilities(ctx context.Context,
+	req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
+
 	l := s.log.WithField("func", "ValidateVolumeCapabilities()")
 	l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
 
@@ -1356,7 +1467,8 @@ func (s *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 
 	bsrProvider, err := s.resolveBSR(params)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.NotFound,
+			"Volume '%s' does not exist", volInfo.Path)
 	}
 
 	l.Infof("resolved BrickStor: %s, %+v", bsrProvider, params)

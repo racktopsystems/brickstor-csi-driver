@@ -51,7 +51,7 @@ Releases can be found here - https://github.com/racktopsystems/brickstor-csi-dri
   ```
 - Mount propagation must be enabled, the Docker daemon for the cluster must allow shared mounts
   ([instructions](https://github.com/kubernetes-csi/docs/blob/735f1ef4adfcb157afce47c64d750b71012c8151/book/src/Setup.md#enabling-mount-propagation))
-- Depends on preferred mount filesystem type, following utilities must be installed on each Kubernetes node:
+- Depending on preferred mount filesystem type, the following packages must be installed on each Kubernetes node:
   ```bash
   # for NFS
   apt install -y rpcbind nfs-common
@@ -61,9 +61,9 @@ Releases can be found here - https://github.com/racktopsystems/brickstor-csi-dri
 
 ## Installation
 
-1. Create BrickStor default dataset for the driver, ex: `p0/global/data/csi`.
-   By default, the driver will create filesystems in this dataset and mount them for use as Kubernetes volumes.
-2. Clone driver repository
+1. Create the BrickStor default dataset for the driver; e.g. `p0/global/data/csi`.
+   By default, the driver will create datasets under this dataset and mount them for use as Kubernetes volumes.
+2. Clone the driver repository
    ```bash
    git clone https://github.com/racktopsystems/brickstor-csi-driver.git
    cd brickstor-csi-driver
@@ -417,12 +417,6 @@ make
 
 # build go app on local machine
 make build
-
-# build container (+ using build container)
-make container-build
-
-# update deps
-~/go/bin/dep ensure
 ```
 
 ### Run
@@ -436,20 +430,19 @@ Without installation to k8s cluster only version command works:
 ### Publish
 
 ```bash
-# push the latest built container to the local registry (see `Makefile`)
-make container-push-local
-
-# push the latest built container to hub.docker.com
-make container-push-remote
+# push the latest built container to the local registry (specify the correct REGISTRY_LOCAL value)
+make container-push-local REGISTRY_LOCAL=10.2.21.92:5000
 ```
 
 ### Tests
 
-`test-all-*` instructions run:
-- CSI sanity tests from https://github.com/kubernetes-csi/csi-test
-- End-to-end driver tests with real K8s and BrickStor appliances.
+CSI sanity tests from https://github.com/kubernetes-csi/csi-test. Update `tests/csi-sanity/driver-config-csi-sanity.yaml` with the local BrickStor configuration to use for the test.
 
-See [Makefile](Makefile) for more examples.
+```bash
+make test-csi-sanity-container
+```
+
+End-to-end driver tests with real K8s and BrickStor appliances. See [Makefile](Makefile) for more examples.
 
 ```bash
 # Test options to be set before run tests:
@@ -491,7 +484,7 @@ when it's time to publish a new version, a new git tag should be created.
    # build development version:
    make container-build
    # publish to local registry
-   make container-push-local
+   make container-build PUSH=1 REGISTRY=192.168.1.1:5000
    # test plugin using local registry
    TEST_K8S_IP=10.3.199.250 make test-all-local-image-container
    ```

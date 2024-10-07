@@ -7,7 +7,6 @@ WORKDIR /go/src/github.com/racktopsystems/brickstor-csi-driver/
 COPY . ./
 ARG VERSION
 ENV VERSION=$VERSION
-RUN apk add --no-cache make git
 RUN go version
 RUN make build &&\
     cp ./bin/brickstor-csi-driver /

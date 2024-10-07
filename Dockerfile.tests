@@ -4,8 +4,8 @@ ARG BUILD_IMAGE
 FROM $BUILD_IMAGE
 
 # install deps
-RUN apk update &&\
-    apk add --no-cache rpcbind nfs-utils cifs-utils make openssh
+RUN apt update &&\
+    apt install -y rpcbind nfs-common cifs-utils
 
 WORKDIR /go/src/github.com/racktopsystems/brickstor-csi-driver/
 COPY . ./

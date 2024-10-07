@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
@@ -196,10 +197,10 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 		return nil, status.Error(codes.NotFound,
 			fmt.Sprintf("Node %s was removed", configName))
 	}
-	l.Infof("resolved BrickStor: %s, %s", bsrProvider, volumePath)
+	l.Infof("resolved BrickStor: %s, %+v", bsrProvider.Addr(), volumePath)
 
 	// get BrickStor filesystem information
-	filesystem, err := bsrProvider.GetDataset(volumePath)
+	dataset, err := bsrProvider.GetDataset(volumePath)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "Cannot find filesystem '%s': %s", volumePath, err)
 	}
@@ -267,9 +268,9 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
 	// share and mount filesystem with selected type
 	if fsType == config.FsTypeNFS {
-		err = s.mountNFS(req, bsrProvider, filesystem, dataIP, mountOptions)
+		err = s.mountNFS(req, bsrProvider, dataset, dataIP, mountOptions)
 	} else if fsType == config.FsTypeCIFS {
-		err = s.mountCIFS(req, bsrProvider, filesystem, dataIP, mountOptions)
+		err = s.mountCIFS(req, bsrProvider, dataset, dataIP, mountOptions)
 	} else {
 		err = status.Errorf(codes.FailedPrecondition, "Unsupported mount filesystem type: '%s'", fsType)
 	}
@@ -408,8 +409,16 @@ func (s *NodeServer) doMount(mountSource, targetPath, fsType string,
 	l.Infof("mount params: type: '%s', mountSource: '%s', targetPath: '%s', mountOptions(%v): %+v",
 		fsType, mountSource, targetPath, len(mountOptions), mountOptions)
 
-	err = mounter.Mount(mountSource, targetPath, fsType, mountOptions)
-	if err != nil {
+	// If the dataset was just shared, we want to be tolerant if sharemgr
+	// is a little slow getting setup.
+	i := 0
+	for ; i < 10; i++ {
+		err = mounter.Mount(mountSource, targetPath, fsType, mountOptions)
+		// if err != nil {
+		if err == nil {
+			break
+		}
+
 		if os.IsPermission(err) {
 			return status.Errorf(codes.PermissionDenied,
 				"Permission denied to mount '%s' to '%s': %s",
@@ -421,6 +430,10 @@ func (s *NodeServer) doMount(mountSource, targetPath, fsType string,
 				mountSource, targetPath, err)
 		}
 
+		time.Sleep(time.Second)
+	}
+
+	if i == 10 {
 		return status.Errorf(codes.Internal, "Failed to mount '%s' to '%s': %s",
 			mountSource, targetPath, err)
 	}
@@ -522,7 +535,7 @@ func (s *NodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVol
 		return nil, err
 	}
 
-	l.Infof("resolved BrickStor: %s, %s", bsrProvider, volumePath)
+	l.Infof("resolved BrickStor: %s, %+v", bsrProvider.Addr(), volumePath)
 
 	// get BrickStor filesystem information
 	available, err := bsrProvider.GetDsAvailCap(volumePath)

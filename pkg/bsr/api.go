@@ -84,11 +84,11 @@ func (p *Provider) GetDataset(path string) (Dataset, error) {
 			} else if p.Name == "mountpoint" {
 				ds.MountPoint = *p.Value
 			} else if p.Name == "sharenfs" {
-				if len(*p.Value) > 0 {
+				if *p.Value != "-" && *p.Value != "off" {
 					ds.SharedOverNfs = true
 				}
 			} else if p.Name == "sharesmb" {
-				if len(*p.Value) > 0 {
+				if *p.Value != "-" && *p.Value != "off" {
 					ds.SharedOverSmb = true
 				}
 			}
@@ -438,6 +438,7 @@ func (p *Provider) GetSnapshot(snapName string) (Snapshot, error) {
 	snap.Path = dsName
 	snap.Name = s.Name
 	snap.Parent = parent
+	snap.CreatedBy = s.CreatedBy
 	snap.CreationTime = s.Creation
 
 	return snap, nil
@@ -480,6 +481,7 @@ func (p *Provider) GetSnapshots(datasets []string) ([]Snapshot, error) {
 			Path:         dsName,
 			Name:         s.Name,
 			Parent:       parent,
+			CreatedBy:    s.CreatedBy,
 			CreationTime: s.Creation,
 		}
 
