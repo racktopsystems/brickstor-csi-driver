@@ -11,9 +11,7 @@ The BrickStor Container Storage Interface (CSI) Driver provides a CSI interface 
 
 |                   | BrickStor 23.4+|
 |-------------------|----------------|
-| Kubernetes >=1.20 | master |
-
-Releases can be found here - https://github.com/racktopsystems/brickstor-csi-driver/releases
+| Kubernetes >=1.20 | 0.0.1 |
 
 ## Feature List
 |Feature|Feature Status|CSI Driver Version|CSI Spec Version|Kubernetes Version|
@@ -67,7 +65,7 @@ Releases can be found here - https://github.com/racktopsystems/brickstor-csi-dri
    ```bash
    git clone https://github.com/racktopsystems/brickstor-csi-driver.git
    cd brickstor-csi-driver
-   git checkout master (only if currently on a branch)
+   git checkout main (only if currently on a branch)
    ```
 3. Edit the `deploy/kubernetes/brickstor-csi-driver-config.yaml` file. Driver configuration example:
    ```yaml
@@ -430,8 +428,8 @@ Without installation to k8s cluster only version command works:
 ### Publish
 
 ```bash
-# push the latest built container to the local registry (specify the correct REGISTRY_LOCAL value)
-make container-push-local REGISTRY_LOCAL=10.2.21.92:5000
+# push the latest built container to the local registry (specify the correct REGISTRY address)
+make container-build PUSH=1 REGISTRY=192.168.1.1:5000
 ```
 
 ### Tests
@@ -476,7 +474,7 @@ go test tests/e2e/driver_test.go -v -count 1 \
     --k8sSecretFile="./_configs/driver-config-single-default.yaml"
 ```
 
-All development happens in the `master` branch,
+All development happens in the `main` branch,
 when it's time to publish a new version, a new git tag should be created.
 
 1. Build and test the new version using local registry:
@@ -491,7 +489,7 @@ when it's time to publish a new version, a new git tag should be created.
 
 2. To release a new version run command:
    ```bash
-   VERSION=X.X.X make release
+   make release VERSION=X.X.X LATEST=1
    ```
    This script does following:
    - builds driver container 'brickstor-csi-driver'
