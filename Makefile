@@ -7,7 +7,7 @@
 
 DRIVER_NAME = brickstor-csi-driver
 IMAGE_NAME ?= ${DRIVER_NAME}
-VERSION = 0.0.1
+VERSION = 1.0.0
 
 BASE_IMAGE ?= alpine:3.20
 BUILD_IMAGE ?= golang:1.22

@@ -11,7 +11,7 @@ The BrickStor Container Storage Interface (CSI) Driver provides a CSI interface 
 
 |                   | BrickStor 23.4+|
 |-------------------|----------------|
-| Kubernetes >=1.20 | 0.0.1 |
+| Kubernetes >=1.20 | 1.0.0 |
 
 ## Feature List
 |Feature|Feature Status|CSI Driver Version|CSI Spec Version|Kubernetes Version|
