@@ -9,7 +9,6 @@ ARG VERSION
 ENV VERSION=${VERSION:-0.0.0}
 ARG TARGETOS TARGETARCH
 ARG DRIVER_BIN=brickstor-csi-driver_${TARGETOS}_${TARGETARCH}
-RUN pwd && ls -l bin
 RUN go version
 RUN make build
 RUN cp bin/${DRIVER_BIN} /brickstor-csi-driver
