@@ -7,7 +7,7 @@
 
 DRIVER_NAME = brickstor-csi-driver
 IMAGE_NAME ?= ${DRIVER_NAME}
-VERSION = 0.0.1
+VERSION = 1.0.0
 
 BASE_IMAGE ?= alpine:3.20
 BUILD_IMAGE ?= golang:1.22
@@ -36,6 +36,14 @@ DOCKER_ARGS = --build-arg BUILD_IMAGE=${BUILD_IMAGE} \
 PUSH=
 DOCKER_PUSH_ARG = $(if $(PUSH),--push,)
 
+# Tag docker images as latest on demand
+LATEST=
+DOCKER_TAG_LATEST_ARG = $(if $(LATEST),-t ${REGISTRY}/${IMAGE_NAME}:latest,)
+
+DOCKER_TAG_ARGS = ${DOCKER_TAG_LATEST_ARG} \
+	-t ${REGISTRY}/${IMAGE_NAME}:${VERSION} \
+	-t ${REGISTRY}/${IMAGE_NAME}:${COMMIT}
+
 .PHONY: all
 all:
 	@echo "Some commands:"
@@ -61,44 +69,47 @@ vet:
 fmt:
 	CGO_ENABLED=0 GOTOOLCHAIN=local go fmt ./...
 
+DRIVER_LINUX_AMD64_BIN = bin/${DRIVER_NAME}_linux_amd64
+DRIVER_LINUX_ARM64_BIN = bin/${DRIVER_NAME}_linux_arm64
+
+DRIVER_BINS = \
+	${DRIVER_LINUX_AMD64_BIN} \
+	${DRIVER_LINUX_ARM64_BIN}
+
+AMD64_BINS = \
+	${DRIVER_LINUX_AMD64_BIN}
+
+ARM64_BINS = \
+	${DRIVER_LINUX_ARM64_BIN}
+
+$(AMD64_BINS): GOARCH=amd64
+$(ARM64_BINS): GOARCH=arm64
+
 .PHONY: build
-build: vet fmt
-	CGO_ENABLED=0 GOTOOLCHAIN=local GOOS=linux \
-		go build -o bin/${DRIVER_NAME} -ldflags "${LDFLAGS}" ./cmd
+build: $(DRIVER_BINS)
+
+$(DRIVER_BINS): vet fmt
+	@CGO_ENABLED=0 GOTOOLCHAIN=local GOOS=linux GOARCH=$(GOARCH) \
+		go build -ldflags "${LDFLAGS}" -o $@ ./cmd
 
 .PHONY: container-build
 container-build:
 	@echo [INFO] Building docker image ${REGISTRY}/${IMAGE_NAME}:${VERSION}
 	GOTOOLCHAIN=local docker build \
 		-f ${DOCKER_FILE} \
-		-t ${REGISTRY}/${IMAGE_NAME}:${VERSION} \
-		-t ${REGISTRY}/${IMAGE_NAME}:${COMMIT} \
-		--build-arg VERSION=${VERSION} \
-		${DOCKER_ARGS} ${DOCKER_PUSH_ARG} .
-
-.PHONY: container-push-local
-container-push-local:
-ifeq (${VERSION}, master)
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} ${DOCKER_ARGS} .
-	docker tag  ${IMAGE_NAME}:${VERSION} ${REGISTRY_LOCAL}/${IMAGE_NAME}:${VERSION}
-	docker push ${REGISTRY_LOCAL}/${IMAGE_NAME}:${VERSION}
-else
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:v${VERSION} --build-arg VERSION=v${VERSION} ${DOCKER_ARGS} .
-	docker tag  ${IMAGE_NAME}:v${VERSION} ${REGISTRY_LOCAL}/${IMAGE_NAME}:v${VERSION}
-	docker push ${REGISTRY_LOCAL}/${IMAGE_NAME}:v${VERSION}
-endif
+		--build-arg VERSION=${VERSION} ${DOCKER_ARGS} \
+		${DOCKER_TAG_ARGS} ${DOCKER_PUSH_ARG} .
 
 .PHONY: container-push-remote
 container-push-remote:
-ifeq (${VERSION}, master)
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} ${DOCKER_ARGS} .
-	docker tag  ${IMAGE_NAME}:${VERSION} ${REGISTRY}/${IMAGE_NAME}:${VERSION}
-	docker push ${REGISTRY}/${IMAGE_NAME}:${VERSION}
-else
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:v${VERSION} --build-arg VERSION=v${VERSION} ${DOCKER_ARGS} .
-	docker tag  ${IMAGE_NAME}:v${VERSION} ${REGISTRY}/${IMAGE_NAME}:v${VERSION}
-	docker push ${REGISTRY}/${IMAGE_NAME}:v${VERSION}
-endif
+	docker buildx use mybuilder 2>/dev/null || docker buildx create --name mybuilder --use
+	docker buildx build \
+		--progress=plain \
+		--platform linux/amd64,linux/arm64 \
+		--build-arg VERSION=${VERSION} ${DOCKER_ARGS} \
+		--file ${DOCKER_FILE} \
+		--push \
+		${DOCKER_TAG_ARGS} .
 
 # run e2e k8s tests using image from local docker registry
 .PHONY: test-e2e-k8s-local-image
@@ -188,20 +199,24 @@ ifeq ($(strip ${TEST_K8S_IP}),)
 endif
 
 .PHONY: release
-release:
+release: git-tag container-push-remote
+
+.PHONY: git-tag
+git-tag:
 	@echo "New tag: 'v${VERSION}'\n\n \
-	To change version set enviroment variable 'VERSION=X.X.X make release'.\n\n \
+	To change version: 'make release VERSION=X.X.X'.\n\n \
+	To add latest tag: 'make release LATEST=1'.\n\n \
 	Confirm that:\n \
 		1. New version will be based on current '${GIT_BRANCH}' git branch\n \
 		2. Driver container '${IMAGE_NAME}' will be built\n \
 		3. Login to hub.docker.com will be requested\n \
-		4. Driver version '${REGISTRY}/${IMAGE_NAME}:v${VERSION}' will be pushed to hub.docker.com\n \
-		5. CHANGELOG.md file will be updated\n \
-		6. Git tag 'v${VERSION}' will be created and pushed to the repository.\n\n \
+		4. CHANGELOG.md file will be updated\n \
+		5. Git tag 'v${VERSION}' will be created and pushed to the repository.\n\n \
+		6. Driver version '${REGISTRY}/${IMAGE_NAME}:${VERSION}' will be pushed to hub.docker.com\n \
 		Are you sure? [y/N]: "
 	@(read ANSWER && case "$$ANSWER" in [yY]) true;; *) false;; esac)
 	git checkout -b ${VERSION}
-	sed -i 's/:master/:v$(VERSION)/g' deploy/kubernetes/brickstor-csi-driver.yaml
+	sed -i '' 's/:latest/:${VERSION}/g' deploy/kubernetes/brickstor-csi-driver.yaml
 	docker login
 	git add deploy/kubernetes/brickstor-csi-driver.yaml
 	git commit -m "release v${VERSION}"

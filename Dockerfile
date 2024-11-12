@@ -2,17 +2,19 @@ ARG BASE_IMAGE
 ARG BUILD_IMAGE
 
 # build container
-FROM $BUILD_IMAGE as builder
+FROM ${BUILD_IMAGE:-golang:latest} AS builder
 WORKDIR /go/src/github.com/racktopsystems/brickstor-csi-driver/
 COPY . ./
 ARG VERSION
-ENV VERSION=$VERSION
+ENV VERSION=${VERSION:-0.0.0}
+ARG TARGETOS TARGETARCH
+ARG DRIVER_BIN=brickstor-csi-driver_${TARGETOS}_${TARGETARCH}
 RUN go version
-RUN make build &&\
-    cp ./bin/brickstor-csi-driver /
+RUN make build
+RUN cp bin/${DRIVER_BIN} /brickstor-csi-driver
 
 # driver container
-FROM $BASE_IMAGE
+FROM ${BASE_IMAGE:-alpine:latest}
 LABEL name="brickstor-csi-driver"
 LABEL maintainer="RackTop Systems, Inc."
 LABEL description="BrickStor CSI Driver"
