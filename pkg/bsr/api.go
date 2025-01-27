@@ -333,7 +333,7 @@ func (p *Provider) SetDatasetACL(path string, readOnly bool) error {
 
 	dsId := resp.Dataset.Id
 	fsAce := rest.FSAce{
-		Sid:              "everyone@",
+		Sid:              "S-1-1-0",        // well known SID for 'everyone'
 		PermissionFlags:  "rwxpdDaARWcCos", // default r/w
 		InheritanceFlags: "fd-----",
 		AccessType:       "Allow",
