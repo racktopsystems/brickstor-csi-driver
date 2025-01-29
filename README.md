@@ -415,6 +415,9 @@ make
 
 # build go app on local machine
 make build
+
+# build go app inside Docker container using an official golang image
+make docker-build VERSION=1.0.1
 ```
 
 ### Run
@@ -477,24 +480,33 @@ go test tests/e2e/driver_test.go -v -count 1 \
 All development happens in the `main` branch,
 when it's time to publish a new version, a new git tag should be created.
 
-1. Build and test the new version using local registry:
-   ```bash
-   # build development version:
-   make container-build
-   # publish to local registry
-   make container-build PUSH=1 REGISTRY=192.168.1.1:5000
-   # test plugin using local registry
-   TEST_K8S_IP=10.3.199.250 make test-all-local-image-container
-   ```
+Build and test the new version using local registry:
+```bash
+# build a development version:
+make container-build
+# publish to local registry
+make container-build PUSH=1 REGISTRY=192.168.1.1:5000
+# test plugin using local registry
+TEST_K8S_IP=10.3.199.250 make test-all-local-image-container
+```
 
-2. To release a new version run command:
-   ```bash
-   make release VERSION=X.X.X LATEST=1
-   ```
-   This script does following:
-   - builds driver container 'brickstor-csi-driver'
-   - Login to hub.docker.com will be requested
-   - publishes driver version 'racktopsystems/brickstor-csi-driver:X.X.X' to hub.docker.com
-   - creates new Git tag 'vX.X.X' and pushes to the repository.
+### Release
 
-3. Update Github [releases](https://github.com/racktopsystems/brickstor-csi-driver/releases).
+`Makefile` provides a release script which does the following
+  - Creates new git tag 'vX.X.X' and pushes to the repository
+  - Requests login to hub.docker.com
+  - Builds Docker image 'brickstor-csi-driver'
+  - Publishes driver version 'racktopsystems/brickstor-csi-driver:X.X.X' to hub.docker.com
+   
+To release a new version
+
+1. [Build](#build) the driver binaries.
+2. Run the release script:
+    ```bash
+    # VERSION=X.X.X is the version to be released. Also tags Docker image using this version.
+
+    # LATEST=1 will tag resulting Docker image as latest (default is not).
+
+    make release VERSION=X.X.X LATEST=1
+    ```
+2. Update Github [releases](https://github.com/racktopsystems/brickstor-csi-driver/releases).
