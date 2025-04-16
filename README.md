@@ -11,24 +11,24 @@ The BrickStor Container Storage Interface (CSI) Driver provides a CSI interface 
 
 |                   | BrickStor 23.4+|
 |-------------------|----------------|
-| Kubernetes >=1.20 | 1.0.0 |
+| Kubernetes >=1.20 | 1.0.2 |
 
 ## Feature List
 |Feature|Feature Status|CSI Driver Version|CSI Spec Version|Kubernetes Version|
 |--- |--- |--- |--- |--- |
-|Static Provisioning|Beta|>= v1.0.0|>= v1.0.0|>=1.13|
-|Dynamic Provisioning|Beta|>= v1.0.0|>= v1.0.0|>=1.13|
-|RW mode|Beta|>= v1.0.0|>= v1.0.0|>=1.13|
-|RO mode|Beta|>= v1.0.0|>= v1.0.0|>=1.13|
-|Creating and deleting snapshot|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
-|Provision volume from snapshot|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
-|Provision volume from another volume|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
-|List snapshots of a volume|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
-|Expand volume|Beta|>= v1.0.0|>= v1.1.0|>=1.16|
-|Access list for volume (NFS only)|Beta|>= v1.0.0|>= v1.0.0|>=1.13|
-|Topology|Beta|>= v1.0.0|>= v1.0.0|>=1.17|
-|StorageClass Secrets|Beta|>= v1.0.0|>= v1.0.0|>=1.13|
-|Mount options|Beta|>= v1.0.0|>= v1.0.0|>=v1.13|
+|Static Provisioning|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|Dynamic Provisioning|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|RW mode|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|RO mode|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|Creating and deleting snapshot|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|Provision volume from snapshot|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|Provision volume from another volume|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|List snapshots of a volume|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|Expand volume|GA|>= 1.0.2|>= 1.1.0|>=1.20|
+|Access list for volume (NFS only)|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|Topology|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|StorageClass Secrets|GA|>= 1.0.2|>= 1.0.0|>=1.20|
+|Mount options|GA|>= 1.0.2|>= 1.0.0|>=1.20|
 
 
 ## Requirements

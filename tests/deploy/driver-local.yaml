@@ -1,6 +1,6 @@
 # BrickStor CSI Driver (master)
 #
-# This driver version works with Kubernetes version >=1.16
+# This driver version works with Kubernetes version >=1.20
 #
 # In production, each CSI driver deployment has to be customized to avoid conflicts,
 # use non-default namespace and different names for non-namespaced entities like the ClusterRole
@@ -14,7 +14,7 @@
 # BrickStor CSI Driver
 # ----------------------
 
-apiVersion: storage.k8s.io/v1beta1 #k8s =>1.14
+apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: brickstor-csi-driver.racktopsystems.com
