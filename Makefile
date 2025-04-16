@@ -32,7 +32,8 @@ LDFLAGS ?= \
 
 DOCKER_ARGS = --build-arg BUILD_IMAGE=$(BUILD_IMAGE) \
               --build-arg BASE_IMAGE=$(BASE_IMAGE) \
-			  --build-arg BIN_DIR=$(OUTPUT_DIR)
+			  --build-arg BIN_DIR=$(OUTPUT_DIR) \
+			  --build-arg VERSION=$(VERSION)
 
 # Pushing Docker image(s) to registry on demand
 PUSH=
@@ -108,7 +109,7 @@ container-build:
 	@echo [INFO] Building docker image $(REGISTRY)/$(IMAGE_NAME):$(VERSION)
 	GOTOOLCHAIN=local docker build \
 		-f $(DOCKER_FILE) \
-		--build-arg VERSION=$(VERSION) $(DOCKER_ARGS) \
+		$(DOCKER_ARGS) \
 		$(DOCKER_TAG_ARGS) $(DOCKER_PUSH_ARG) .
 
 .PHONY: container-push-remote
@@ -117,7 +118,7 @@ container-push-remote:
 	docker buildx build \
 		--progress=plain \
 		--platform linux/amd64,linux/arm64 \
-		--build-arg VERSION=$(VERSION) $(DOCKER_ARGS) \
+		$(DOCKER_ARGS) \
 		--file $(DOCKER_FILE) \
 		--push \
 		$(DOCKER_TAG_ARGS) .
