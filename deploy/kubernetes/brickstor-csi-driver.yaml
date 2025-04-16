@@ -251,7 +251,7 @@ spec:
                 limits:
                   memory: "32Mi"
                   cpu: "10m"
-          image: racktop/brickstor-csi-driver:latest
+          image: racktop/brickstor-csi-driver:1.0.2
           imagePullPolicy: IfNotPresent
           args:
             - --nodeid=$(KUBE_NODE_NAME)
@@ -370,7 +370,7 @@ spec:
             capabilities:
               add: ['SYS_ADMIN']
             allowPrivilegeEscalation: true
-          image: racktop/brickstor-csi-driver:latest
+          image: racktop/brickstor-csi-driver:1.0.2
           imagePullPolicy: IfNotPresent
           args:
             - --nodeid=$(KUBE_NODE_NAME)
