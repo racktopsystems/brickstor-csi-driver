@@ -30,10 +30,11 @@ LDFLAGS ?= \
 	-X github.com/racktopsystems/brickstor-csi-driver/pkg/driver.Commit=$(COMMIT) \
 	-X github.com/racktopsystems/brickstor-csi-driver/pkg/driver.DateTime=$(DATETIME)
 
-DOCKER_ARGS = --build-arg BUILD_IMAGE=$(BUILD_IMAGE) \
-              --build-arg BASE_IMAGE=$(BASE_IMAGE) \
-			  --build-arg BIN_DIR=$(OUTPUT_DIR) \
-			  --build-arg VERSION=$(VERSION)
+DOCKER_ARGS = \
+	--build-arg BUILD_IMAGE=$(BUILD_IMAGE) \
+	--build-arg BASE_IMAGE=$(BASE_IMAGE) \
+	--build-arg BIN_DIR=$(OUTPUT_DIR) \
+	--build-arg VERSION=$(VERSION)
 
 # Pushing Docker image(s) to registry on demand
 PUSH=
